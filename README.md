@@ -21,19 +21,29 @@ Las skills se desactualizan, la memoria se corrompe. Este server es una fuente d
 ## Instalación
 
 ```bash
-# 1. Agregar a ~/.hermes/config.yaml
-mcp_servers:
-  mcp-capabilities:
-    command: /home/ernesto-abec/Proyectos/mcp-capabilities-server/.venv/bin/python3
-    args:
-      - /home/ernesto-abec/Proyectos/mcp-capabilities-server/server.py
-    timeout: 60
+# 1. Clonar (si no lo tienes)
+git clone https://github.com/erniomaldo/mcp-capabilities-server.git ~/Proyectos/mcp-capabilities-server
 
-# 2. Verificar
+# 2. Crear venv e instalar deps
+cd ~/Proyectos/mcp-capabilities-server
+python3 -m venv .venv
+source .venv/bin/activate
+pip install mcp httpx pyyaml fastembed sqlite-vec
+
+# 3. Agregar a ~/.hermes/config.yaml
+hermes config set mcp_servers.mcp-capabilities "
+  command: ~/Proyectos/mcp-capabilities-server/.venv/bin/python3
+  args:
+    - ~/Proyectos/mcp-capabilities-server/server.py
+  timeout: 60
+"
+
+# 4. Verificar
 hermes mcp list
+hermes mcp test mcp-capabilities
 ```
 
-Requiere: `pip install mcp httpx pyyaml` (en el venv)
+Requiere: `pip install mcp httpx pyyaml fastembed sqlite-vec` (en el venv)
 
 ## Scrape standalone (sin MCP)
 
