@@ -159,6 +159,7 @@ def find_mcp_servers(config: dict, self_name: str = "mcp-capabilities") -> list[
         if "url" in sv:
             entry["transport"] = "http"
             entry["url"] = sv["url"]
+            entry["headers"] = sv.get("headers", {})
             entry["timeout"] = sv.get("timeout", 30)
         elif "command" in sv:
             entry["transport"] = "stdio"
@@ -196,6 +197,23 @@ def resolve_stdio_command(entry: dict) -> list[str] | None:
                 pkg_name = a.split("@")[0] + "@" + a.split("@")[1] if a.count("@") >= 2 else a
                 pkg_name = pkg_name.rsplit("@", 1)[0] if pkg_name.count("@") >= 2 else pkg_name
                 break
+        if not pkg_name:
+            # Check --package=<name> or -p <name> / --package <name> format
+            for i, a in enumerate(npx_args):
+                if a.startswith("--package="):
+                    raw = a.split("=", 1)[1]
+                    if raw.count("@") >= 2:
+                        pkg_name = raw.rsplit("@", 1)[0]
+                    else:
+                        pkg_name = raw
+                    break
+                elif a in ("-p", "--package") and i + 1 < len(npx_args):
+                    raw = npx_args[i + 1]
+                    if raw.count("@") >= 2:
+                        pkg_name = raw.rsplit("@", 1)[0]
+                    else:
+                        pkg_name = raw
+                    break
         if not pkg_name:
             for a in npx_args:
                 if not a.startswith("-") and not a.startswith("@"):
@@ -276,12 +294,14 @@ def resolve_stdio_command(entry: dict) -> list[str] | None:
     return None
 
 
-def scrape_http_server(name: str, url: str, timeout: int = 30) -> list[dict]:
+def scrape_http_server(name: str, url: str, timeout: int = 30, custom_headers: dict | None = None) -> list[dict]:
     tools = []
     body = {"jsonrpc": "2.0", "id": "init", "method": "initialize",
             "params": {"protocolVersion": "2024-11-05", "capabilities": {},
                        "clientInfo": {"name": "mcp-capabilities", "version": "1.0"}}}
     headers = {"Content-Type": "application/json", "Accept": "application/json, text/event-stream"}
+    if custom_headers:
+        headers.update(custom_headers)
     try:
         with httpx.Client(timeout=timeout) as c:
             r = c.post(url, json=body, headers=headers)
@@ -411,7 +431,7 @@ def scrape_all(servers: list[dict], db_path: str | Path | None = None) -> tuple[
 
         sv_tools = []
         if sv["transport"] == "http":
-            sv_tools = scrape_http_server(name, sv["url"], sv.get("timeout", 30))
+            sv_tools = scrape_http_server(name, sv["url"], sv.get("timeout", 30), sv.get("headers", {}))
         elif sv["transport"] == "stdio":
             sv_tools = scrape_stdio_server(name, sv)
         else:
